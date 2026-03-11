@@ -381,4 +381,6 @@ io.emit("sync",{...radio,time:getTime()});
 
 });
 
-server.listen(3000,()=>console.log("V22 BROADCAST SYNC READY"));
+server.listen(process.env.PORT || 3000, () => {
+    console.log("SERVER READY");
+});
