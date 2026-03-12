@@ -96,17 +96,6 @@ input,select{background:black;color:#66cfff;border:1px solid #66cfff;padding:6px
 .panel{background:#0b0b0b;border:1px solid #66cfff;padding:16px;margin-bottom:20px}
 </style>`;
 
-const COLOR_OPTIONS = `
-<option value="#66cfff">Blue</option>
-<option value="#ffffff">White</option>
-<option value="#ff5555">Red</option>
-<option value="#ffaa00">Orange</option>
-<option value="#ff00ff">Magenta</option>
-<option value="#00ffff">Cyan</option>
-<option value="#aaaaaa">Gray</option>
-<option value="#ffff55">Yellow</option>
-`;
-
 /* HOMEPAGE */
 
 app.get("/",(req,res)=>{
@@ -130,25 +119,18 @@ res.send(`${STYLE}
 <div id="chat" style="height:320px;background:black;border:1px solid #66cfff;padding:10px;overflow:auto;margin-bottom:10px"></div>
 
 <input id="msg" style="width:60%">
-<select id="color">${COLOR_OPTIONS}</select>
+<select id="color">
+<option value="#66cfff">Blue</option>
+<option value="#ffffff">White</option>
+<option value="#ff5555">Red</option>
+</select>
 </div>
 
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
-
 const s=io();
-
-function alias(){
-let a=localStorage.alias;
-if(!a){
-a=prompt("Alias?");
-if(!a) return null;
-localStorage.alias=a;
-}
-return a;
-}
 
 msg.addEventListener("keydown",e=>{
 if(e.key==="Enter") send();
@@ -163,13 +145,16 @@ function send(){
 const t=msg.value.trim();
 if(!t) return;
 
-const a=alias();
+let a=localStorage.alias;
+if(!a){
+a=prompt("Alias?");
 if(!a) return;
+localStorage.alias=a;
+}
 
 s.emit("chat",{text:t,alias:a,color:color.value});
 msg.value="";
 }
-
 </script>`);
 });
 
@@ -193,7 +178,7 @@ const controls = admin ? `
 res.send(`${STYLE}
 
 <div style="padding:16px;border-bottom:1px solid #66cfff;display:flex;justify-content:space-between">
-<div>T.H.R.O.B. RADIO</div>
+<div>REGIMENT RADIO</div>
 <button onclick="location.href='/'">HOME</button>
 </div>
 
@@ -213,7 +198,11 @@ ${controls}
 <div class="panel">
 <div id="rchat" style="height:220px;background:black;border:1px solid #66cfff;padding:8px;overflow:auto;margin-bottom:10px"></div>
 <input id="rmsg" style="width:60%">
-<select id="rcolor">${COLOR_OPTIONS}</select>
+<select id="rcolor">
+<option value="#66cfff">Blue</option>
+<option value="#ffffff">White</option>
+<option value="#ff5555">Red</option>
+</select>
 </div>
 
 </div>
@@ -226,16 +215,6 @@ ${controls}
 
 const s=io();
 let player;
-
-function alias(){
-let a=localStorage.alias;
-if(!a){
-a=prompt("Alias?");
-if(!a) return null;
-localStorage.alias=a;
-}
-return a;
-}
 
 function vid(u){
 const m=u.match(/v=([^&]+)/);
@@ -254,8 +233,7 @@ seek.value=Math.floor(player.getCurrentTime());
 
 s.on("sync",st=>{
 
-status.innerHTML="Listeners: "+st.listeners+"<br>"+
-"Broadcaster: "+(st.broadcaster||"None");
+status.innerHTML="Listeners: "+st.listeners+"<br>"+"Broadcaster: "+(st.broadcaster||"None");
 
 if(!st.url) return;
 
@@ -267,10 +245,6 @@ player.loadVideoById({videoId:vid(st.url),startSeconds:st.time});
 player.__loaded=true;
 }
 
-if(!st.playing){
-setTimeout(()=>player.pauseVideo(),300);
-}
-
 queue.innerHTML="";
 st.queue.forEach((u,i)=>{
 queue.innerHTML+="["+(i+1)+"] "+u+"<br>";
@@ -278,23 +252,18 @@ queue.innerHTML+="["+(i+1)+"] "+u+"<br>";
 
 });
 
-s.on("radiochat",m=>{
-rchat.innerHTML+=m+"<br>";
-rchat.scrollTop=rchat.scrollHeight;
-});
-
 rmsg.addEventListener("keydown",e=>{
 if(e.key==="Enter") sendRadio();
 });
 
 function sendRadio(){
-const t=rmsg.value.trim();
-if(!t) return;
-
-const a=alias();
+let a=localStorage.alias;
+if(!a){
+a=prompt("Alias?");
 if(!a) return;
-
-s.emit("radiochat",{text:t,alias:a,color:rcolor.value});
+localStorage.alias=a;
+}
+s.emit("radiochat",{text:rmsg.value,alias:a,color:rcolor.value});
 rmsg.value="";
 }
 
