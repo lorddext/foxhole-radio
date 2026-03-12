@@ -303,8 +303,14 @@ function seekTo(){s.emit("seek",seek.value);}
 /* SOCKET */
 
 io.on("connection",sock=>{
+
 radio.listeners++;
+
+/* broadcast to everyone */
 sync();
+
+/* guarantee new client gets state */
+sock.emit("sync",{...radio,time:getTime()});
 
 sock.on("disconnect",()=>{
 radio.listeners--;
@@ -330,11 +336,13 @@ io.emit("radiochat","["+stamp()+"] <span style='color:"+m.color+"'>"+name+"</spa
 sock.on("play",l=>{
 const u=sock.request.session?.passport?.user;
 if(!u||!u.isAdmin) return;
+
 radio.url=l;
 radio.time=0;
 radio.playing=true;
 radio.lastUpdate=Date.now();
 radio.broadcaster=u.username;
+
 sync();
 });
 
