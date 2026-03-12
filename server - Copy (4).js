@@ -23,12 +23,16 @@ app.use(passport.initialize());
 app.use(passport.session());
 io.use((s,n)=>sm(s.request,{},n));
 
+/* CONFIG */
+
 const DISCORD_CLIENT_ID="1481383774225698916";
 const DISCORD_CLIENT_SECRET="bkuzEHamC1YljQqxBmW5TUXShjftgT3E";
 const DISCORD_CALLBACK="https://throbradio.lol/auth/discord/callback";
 
 const GUILD_ID="1481362830753140939";
 const ADMIN_ROLE_ID="1481399008609042432";
+
+/* PASSPORT */
 
 passport.serializeUser((u,d)=>d(null,u));
 passport.deserializeUser((o,d)=>d(null,o));
@@ -54,6 +58,8 @@ done(null,p);
 }
 }));
 
+/* RADIO STATE */
+
 let radio={
 url:null,
 queue:[],
@@ -69,9 +75,11 @@ if(!radio.playing) return radio.time;
 return radio.time+(Date.now()-radio.lastUpdate)/1000;
 }
 
-function sync(){
+function broadcastSync(){
 io.emit("sync",{...radio,time:getTime()});
 }
+
+/* AUTH */
 
 app.get("/auth/discord",passport.authenticate("discord"));
 
@@ -80,13 +88,14 @@ passport.authenticate("discord",{failureRedirect:"/"}),
 (req,res)=>res.redirect("/radio")
 );
 
+/* STYLE */
+
 const STYLE=`<style>
 body{margin:0;background:#050505;color:#66cfff;font-family:Consolas}
 button{background:#050505;color:#66cfff;border:1px solid #66cfff;padding:6px 14px;cursor:pointer}
 button:hover{background:#66cfff;color:black}
 input,select{background:black;color:#66cfff;border:1px solid #66cfff;padding:6px}
 .panel{background:#0b0b0b;border:1px solid #66cfff;padding:16px;margin-bottom:20px}
-.small{font-size:12px;color:#8fdfff}
 </style>`;
 
 const COLORS=`
@@ -124,11 +133,6 @@ res.send(`${STYLE}
 
 <input id="msg" style="width:60%">
 <select id="color">${COLORS}</select>
-
-<div class="small" style="margin-top:12px">
-ver alpha001 • fixes & improvements in the works
-</div>
-
 </div>
 
 </div>
@@ -189,15 +193,7 @@ res.send(`${STYLE}
 
 <div style="flex:1;padding:30px;border-left:1px solid #66cfff">
 
-<div class="panel">
-<div id="status"></div>
-<div class="small" style="margin-top:8px">
-If video breaks, refresh page to resync to broadcaster timeline.
-</div>
-<div class="small">
-Fixes & improvements in the works.
-</div>
-</div>
+<div class="panel"><div id="status"></div></div>
 
 ${admin?`
 <div class="panel">
@@ -245,9 +241,7 @@ seek.value=Math.floor(player.getCurrentTime());
 
 s.on("sync",st=>{
 
-status.innerHTML=
-"Listeners: "+st.listeners+"<br>"+
-"Broadcaster: "+(st.broadcaster||"None");
+status.innerHTML="Listeners: "+st.listeners+"<br>Broadcaster: "+(st.broadcaster||"None");
 
 if(!st.url||!player) return;
 
@@ -304,11 +298,11 @@ function seekTo(){s.emit("seek",seek.value);}
 
 io.on("connection",sock=>{
 radio.listeners++;
-sync();
+broadcastSync();
 
 sock.on("disconnect",()=>{
 radio.listeners--;
-sync();
+broadcastSync();
 });
 
 function stamp(){
@@ -335,12 +329,12 @@ radio.time=0;
 radio.playing=true;
 radio.lastUpdate=Date.now();
 radio.broadcaster=u.username;
-sync();
+broadcastSync();
 });
 
 sock.on("queue",l=>{
 radio.queue.push(l);
-sync();
+broadcastSync();
 });
 
 sock.on("skip",()=>{
@@ -348,25 +342,25 @@ radio.url=radio.queue.shift()||null;
 radio.time=0;
 radio.lastUpdate=Date.now();
 radio.playing=true;
-sync();
+broadcastSync();
 });
 
 sock.on("pause",()=>{
 radio.time=getTime();
 radio.playing=false;
-sync();
+broadcastSync();
 });
 
 sock.on("resume",()=>{
 radio.lastUpdate=Date.now();
 radio.playing=true;
-sync();
+broadcastSync();
 });
 
 sock.on("seek",t=>{
 radio.time=Number(t);
 radio.lastUpdate=Date.now();
-sync();
+broadcastSync();
 });
 
 });
