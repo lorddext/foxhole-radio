@@ -24,7 +24,7 @@ io.use((s,n)=>sm(s.request,{},n));
 
 const DISCORD_CLIENT_ID = "1481383774225698916";
 const DISCORD_CLIENT_SECRET = "bkuzEHamC1YljQqxBmW5TUXShjftgT3E";
-const DISCORD_CALLBACK = "http://localhost:3000/auth/discord/callback";
+const DISCORD_CALLBACK = "https://throbradio.lol/auth/discord/callback";
 
 const GUILD_ID = "1481362830753140939";
 const ADMIN_ROLE_ID = "1481399008609042432";
