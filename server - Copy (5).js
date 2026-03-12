@@ -191,8 +191,12 @@ res.send(`${STYLE}
 
 <div class="panel">
 <div id="status"></div>
-<div class="small">If video breaks, refresh page to resync to broadcaster timeline.</div>
-<div class="small">Fixes & improvements in the works.</div>
+<div class="small" style="margin-top:8px">
+If video breaks, refresh page to resync to broadcaster timeline.
+</div>
+<div class="small">
+Fixes & improvements in the works.
+</div>
 </div>
 
 ${admin?`
@@ -242,8 +246,8 @@ seek.value=Math.floor(player.getCurrentTime());
 s.on("sync",st=>{
 
 status.innerHTML=
-"<b>Listeners:</b> "+st.listeners+"<br>"+
-"<b>Current Broadcaster:</b> "+(st.broadcaster||"No Broadcaster");
+"Listeners: "+st.listeners+"<br>"+
+"Broadcaster: "+(st.broadcaster||"None");
 
 if(!st.url||!player) return;
 
@@ -299,12 +303,8 @@ function seekTo(){s.emit("seek",seek.value);}
 /* SOCKET */
 
 io.on("connection",sock=>{
-
 radio.listeners++;
 sync();
-
-/* guarantee new client state */
-sock.emit("sync",{...radio,time:getTime()});
 
 sock.on("disconnect",()=>{
 radio.listeners--;
@@ -370,6 +370,8 @@ sync();
 });
 
 });
+
+/* LISTEN */
 
 const PORT=process.env.PORT||3000;
 server.listen(PORT,"0.0.0.0",()=>console.log("SERVER READY",PORT));
