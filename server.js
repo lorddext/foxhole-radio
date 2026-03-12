@@ -36,7 +36,8 @@ const ADMIN_ROLE_ID="1481399008609042432";
 passport.serializeUser((u,d)=>d(null,u));
 passport.deserializeUser((o,d)=>d(null,o));
 
-passport.use(new DiscordStrategy({
+passport.use(new DiscordStrategy(
+{
 clientID:DISCORD_CLIENT_ID,
 clientSecret:DISCORD_CLIENT_SECRET,
 callbackURL:DISCORD_CALLBACK,
@@ -44,18 +45,19 @@ scope:["identify","guilds","guilds.members.read"]
 },
 async(a,r,p,done)=>{
 try{
-const g=await fetch(
+const g = await fetch(
 "https://discord.com/api/users/@me/guilds/"+GUILD_ID+"/member",
-{headers:{Authorization:"Bearer "+a}}
+{ headers:{ Authorization:"Bearer "+a } }
 );
-const m=await g.json();
-p.isAdmin=m.roles && m.roles.includes(ADMIN_ROLE_ID);
+const m = await g.json();
+p.isAdmin = m.roles && m.roles.includes(ADMIN_ROLE_ID);
 done(null,p);
 }catch{
 p.isAdmin=false;
 done(null,p);
 }
-}));
+}
+));
 
 // ================== RADIO STATE ==================
 let radio={
