@@ -293,47 +293,6 @@ function seekTo(){s.emit("seek",seek.value);}
 </script>
 `);
 });
-// ================= CHAT PROTECTION =================
-
-const chatState = new Map();
-
-function allowMessage(id, text){
-
-const now = Date.now();
-
-if(!chatState.has(id)){
-chatState.set(id,{
-last:0,
-lastMsg:"",
-violations:0
-});
-}
-
-const s = chatState.get(id);
-
-// RATE LIMIT
-if(now - s.last < 800) return false;
-
-// LENGTH LIMIT
-if(text.length > 220) return false;
-
-// UNICODE DENSITY FILTER
-const weird = text.replace(/[a-zA-Z0-9 .,!?]/g,"");
-if(weird.length > text.length * 0.4) return false;
-
-// REPEAT BLOCK
-if(text === s.lastMsg){
-s.violations++;
-if(s.violations >= 3) return false;
-}else{
-s.violations = 0;
-}
-
-s.last = now;
-s.lastMsg = text;
-
-return true;
-}
 
 // ================= SOCKET =================
 io.on("connection",sock=>{
@@ -351,20 +310,12 @@ return new Date().toLocaleTimeString();
 }
 
 sock.on("chat",m=>{
-
-if(!m?.text) return;
-
-if(!allowMessage(sock.id, m.text)) return;
 const user=sock.request.session?.passport?.user;
 const name=user?user.username:m.alias;
 io.emit("chat","["+stamp()+"] <span style='color:"+m.color+"'>"+name+"</span>: "+m.text);
 });
 
 sock.on("radiochat",m=>{
-
-if(!m?.text) return;
-
-if(!allowMessage(sock.id+"r", m.text)) return;
 const user=sock.request.session?.passport?.user;
 const name=user?user.username:m.alias;
 io.emit("radiochat","["+stamp()+"] <span style='color:"+m.color+"'>"+name+"</span>: "+m.text);
