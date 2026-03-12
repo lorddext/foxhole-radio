@@ -1,4 +1,3 @@
-// --- SAME TOP (unchanged) ---
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
@@ -40,9 +39,9 @@ passport.deserializeUser((o,d)=>d(null,o));
 
 passport.use(new DiscordStrategy(
 {
-clientID: DISCORD_CLIENT_ID,
-clientSecret: DISCORD_CLIENT_SECRET,
-callbackURL: DISCORD_CALLBACK,
+clientID:DISCORD_CLIENT_ID,
+clientSecret:DISCORD_CLIENT_SECRET,
+callbackURL:DISCORD_CALLBACK,
 scope:["identify","guilds","guilds.members.read"]
 },
 async(a,r,p,done)=>{
@@ -108,14 +107,16 @@ const COLOR_OPTIONS = `
 <option value="#ffff55">Yellow</option>
 `;
 
-/* HOMEPAGE unchanged */
+/* HOMEPAGE */
 
 app.get("/",(req,res)=>{
+
 const authBlock=req.user
 ? "Authenticated as "+req.user.username
 : "<button onclick=\"location.href='/auth/discord'\">SIGN IN</button>";
 
 res.send(`${STYLE}
+
 <div style="padding:16px;border-bottom:1px solid #66cfff;display:flex;justify-content:space-between">
 <div>THROB REGIMENT NETWORK</div>
 <button onclick="location.href='/radio'">ENTER RADIO</button>
@@ -127,6 +128,7 @@ res.send(`${STYLE}
 
 <div class="panel">
 <div id="chat" style="height:320px;background:black;border:1px solid #66cfff;padding:10px;overflow:auto;margin-bottom:10px"></div>
+
 <input id="msg" style="width:60%">
 <select id="color">${COLOR_OPTIONS}</select>
 </div>
@@ -135,6 +137,7 @@ res.send(`${STYLE}
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
+
 const s=io();
 
 function alias(){
@@ -159,15 +162,18 @@ chat.scrollTop=chat.scrollHeight;
 function send(){
 const t=msg.value.trim();
 if(!t) return;
+
 const a=alias();
 if(!a) return;
+
 s.emit("chat",{text:t,alias:a,color:color.value});
 msg.value="";
 }
+
 </script>`);
 });
 
-/* RADIO PAGE FIXED */
+/* RADIO PAGE */
 
 app.get("/radio",(req,res)=>{
 
@@ -199,8 +205,17 @@ res.send(`${STYLE}
 </div>
 
 <div style="flex:1;padding:30px;border-left:1px solid #66cfff">
+
 <div class="panel"><div id="status"></div></div>
+
 ${controls}
+
+<div class="panel">
+<div id="rchat" style="height:220px;background:black;border:1px solid #66cfff;padding:8px;overflow:auto;margin-bottom:10px"></div>
+<input id="rmsg" style="width:60%">
+<select id="rcolor">${COLOR_OPTIONS}</select>
+</div>
+
 </div>
 
 </div>
@@ -211,7 +226,16 @@ ${controls}
 
 const s=io();
 let player;
-let currentVideo=null;
+
+function alias(){
+let a=localStorage.alias;
+if(!a){
+a=prompt("Alias?");
+if(!a) return null;
+localStorage.alias=a;
+}
+return a;
+}
 
 function vid(u){
 const m=u.match(/v=([^&]+)/);
@@ -222,6 +246,12 @@ function onYouTubeIframeAPIReady(){
 player=new YT.Player('player',{height:'405',width:'100%'});
 }
 
+setInterval(()=>{
+if(player && player.getCurrentTime){
+seek.value=Math.floor(player.getCurrentTime());
+}
+},500);
+
 s.on("sync",st=>{
 
 status.innerHTML="Listeners: "+st.listeners+"<br>"+
@@ -229,28 +259,44 @@ status.innerHTML="Listeners: "+st.listeners+"<br>"+
 
 if(!st.url) return;
 
-const id=vid(st.url);
-
-if(currentVideo!==id){
-player.loadVideoById({videoId:id,startSeconds:st.time});
-currentVideo=id;
-return;
-}
-
 const local=player.getCurrentTime?player.getCurrentTime():0;
 const drift=Math.abs(local-st.time);
 
-if(drift>3){
-player.seekTo(st.time,true);
+if(!player.__loaded || drift>2){
+player.loadVideoById({videoId:vid(st.url),startSeconds:st.time});
+player.__loaded=true;
 }
 
-if(st.playing){
-player.playVideo();
-}else{
-player.pauseVideo();
+if(!st.playing){
+setTimeout(()=>player.pauseVideo(),300);
 }
+
+queue.innerHTML="";
+st.queue.forEach((u,i)=>{
+queue.innerHTML+="["+(i+1)+"] "+u+"<br>";
+});
 
 });
+
+s.on("radiochat",m=>{
+rchat.innerHTML+=m+"<br>";
+rchat.scrollTop=rchat.scrollHeight;
+});
+
+rmsg.addEventListener("keydown",e=>{
+if(e.key==="Enter") sendRadio();
+});
+
+function sendRadio(){
+const t=rmsg.value.trim();
+if(!t) return;
+
+const a=alias();
+if(!a) return;
+
+s.emit("radiochat",{text:t,alias:a,color:rcolor.value});
+rmsg.value="";
+}
 
 function play(){s.emit("play",link.value);}
 function queueSong(){s.emit("queue",link.value);}
@@ -262,11 +308,13 @@ function seekTo(){s.emit("seek",seek.value);}
 </script>`);
 });
 
-/* SOCKET unchanged */
+/* SOCKET CORE */
 
 io.on("connection",sock=>{
+
 radio.listeners++;
 sock.emit("sync",{...radio,time:getTime()});
+
 sock.on("disconnect",()=>radio.listeners--);
 
 function stamp(){
@@ -277,6 +325,12 @@ sock.on("chat",m=>{
 const user=sock.request.session?.passport?.user;
 const name=user?user.username:m.alias;
 io.emit("chat","["+stamp()+"] <span style='color:"+m.color+"'>"+name+"</span>: "+m.text);
+});
+
+sock.on("radiochat",m=>{
+const user=sock.request.session?.passport?.user;
+const name=user?user.username:m.alias;
+io.emit("radiochat","["+stamp()+"] <span style='color:"+m.color+"'>"+name+"</span>: "+m.text);
 });
 
 sock.on("play",l=>{
@@ -290,6 +344,19 @@ radio.broadcaster=u.username;
 io.emit("sync",{...radio,time:getTime()});
 });
 
+sock.on("queue",l=>{
+radio.queue.push(l);
+io.emit("sync",{...radio,time:getTime()});
+});
+
+sock.on("skip",()=>{
+radio.url=radio.queue.shift()||null;
+radio.time=0;
+radio.lastUpdate=Date.now();
+radio.playing=true;
+io.emit("sync",{...radio,time:getTime()});
+});
+
 sock.on("pause",()=>{
 radio.time=getTime();
 radio.playing=false;
@@ -299,6 +366,12 @@ io.emit("sync",{...radio,time:getTime()});
 sock.on("resume",()=>{
 radio.lastUpdate=Date.now();
 radio.playing=true;
+io.emit("sync",{...radio,time:getTime()});
+});
+
+sock.on("seek",sec=>{
+radio.time=Number(sec);
+radio.lastUpdate=Date.now();
 io.emit("sync",{...radio,time:getTime()});
 });
 
