@@ -21,7 +21,7 @@ const sm = session({
 app.use(sm);
 app.use(passport.initialize());
 app.use(passport.session());
-io.use((s, n) => sm(s.request, {}, n));
+io.use((s,n)=>sm(s.request,{},n));
 
 /* CONFIG */
 
@@ -34,17 +34,17 @@ const ADMIN_ROLE_ID = "1481399008609042432";
 
 /* PASSPORT */
 
-passport.serializeUser((u, d) => d(null, u));
-passport.deserializeUser((o, d) => d(null, o));
+passport.serializeUser((u,d)=>d(null,u));
+passport.deserializeUser((o,d)=>d(null,o));
 
 passport.use(new DiscordStrategy(
 {
-clientID: DISCORD_CLIENT_ID,
-clientSecret: DISCORD_CLIENT_SECRET,
-callbackURL: DISCORD_CALLBACK,
-scope: ["identify","guilds","guilds.members.read"]
+clientID:DISCORD_CLIENT_ID,
+clientSecret:DISCORD_CLIENT_SECRET,
+callbackURL:DISCORD_CALLBACK,
+scope:["identify","guilds","guilds.members.read"]
 },
-async (a,r,p,done)=>{
+async(a,r,p,done)=>{
 try{
 const g = await fetch(
 "https://discord.com/api/users/@me/guilds/"+GUILD_ID+"/member",
@@ -116,7 +116,6 @@ res.send(`${STYLE}
 <div class="panel">${authBlock}</div>
 
 <div class="panel">
-
 <div id="chat" style="height:320px;background:black;border:1px solid #66cfff;padding:10px;overflow:auto;margin-bottom:10px"></div>
 
 <input id="msg" style="width:60%">
@@ -125,7 +124,6 @@ res.send(`${STYLE}
 <option value="#ffffff">White</option>
 <option value="#ff5555">Red</option>
 </select>
-
 </div>
 
 </div>
@@ -174,6 +172,7 @@ const controls = admin ? `
 <button onclick="skip()">SKIP</button>
 <button onclick="pause()">PAUSE</button>
 <button onclick="resume()">RESUME</button>
+<input type="range" id="seek" min="0" max="1000" style="width:100%" oninput="seekTo()">
 </div>`:`<div class="panel">LISTENING MODE</div>`;
 
 res.send(`${STYLE}
@@ -196,6 +195,16 @@ res.send(`${STYLE}
 
 ${controls}
 
+<div class="panel">
+<div id="rchat" style="height:220px;background:black;border:1px solid #66cfff;padding:8px;overflow:auto;margin-bottom:10px"></div>
+<input id="rmsg" style="width:60%">
+<select id="rcolor">
+<option value="#66cfff">Blue</option>
+<option value="#ffffff">White</option>
+<option value="#ff5555">Red</option>
+</select>
+</div>
+
 </div>
 
 </div>
@@ -216,18 +225,25 @@ function onYouTubeIframeAPIReady(){
 player=new YT.Player('player',{height:'405',width:'100%'});
 }
 
+setInterval(()=>{
+if(player && player.getCurrentTime){
+seek.value=Math.floor(player.getCurrentTime());
+}
+},500);
+
 s.on("sync",st=>{
 
-status.innerHTML=
-"Listeners: "+st.listeners+"<br>"+
-"Broadcaster: "+(st.broadcaster||"None");
+status.innerHTML="Listeners: "+st.listeners+"<br>"+"Broadcaster: "+(st.broadcaster||"None");
 
 if(!st.url) return;
 
-player.loadVideoById({
-videoId:vid(st.url),
-startSeconds:st.time
-});
+const local=player.getCurrentTime?player.getCurrentTime():0;
+const drift=Math.abs(local-st.time);
+
+if(!player.__loaded || drift>2){
+player.loadVideoById({videoId:vid(st.url),startSeconds:st.time});
+player.__loaded=true;
+}
 
 queue.innerHTML="";
 st.queue.forEach((u,i)=>{
@@ -236,16 +252,32 @@ queue.innerHTML+="["+(i+1)+"] "+u+"<br>";
 
 });
 
+rmsg.addEventListener("keydown",e=>{
+if(e.key==="Enter") sendRadio();
+});
+
+function sendRadio(){
+let a=localStorage.alias;
+if(!a){
+a=prompt("Alias?");
+if(!a) return;
+localStorage.alias=a;
+}
+s.emit("radiochat",{text:rmsg.value,alias:a,color:rcolor.value});
+rmsg.value="";
+}
+
 function play(){s.emit("play",link.value);}
 function queueSong(){s.emit("queue",link.value);}
 function skip(){s.emit("skip");}
 function pause(){s.emit("pause");}
 function resume(){s.emit("resume");}
+function seekTo(){s.emit("seek",seek.value);}
 
 </script>`);
 });
 
-/* SOCKET */
+/* SOCKET CORE */
 
 io.on("connection",sock=>{
 
@@ -254,15 +286,30 @@ sock.emit("sync",{...radio,time:getTime()});
 
 sock.on("disconnect",()=>radio.listeners--);
 
+function stamp(){
+return new Date().toLocaleTimeString();
+}
+
 sock.on("chat",m=>{
-io.emit("chat",m.text);
+const user=sock.request.session?.passport?.user;
+const name=user?user.username:m.alias;
+io.emit("chat","["+stamp()+"] <span style='color:"+m.color+"'>"+name+"</span>: "+m.text);
+});
+
+sock.on("radiochat",m=>{
+const user=sock.request.session?.passport?.user;
+const name=user?user.username:m.alias;
+io.emit("radiochat","["+stamp()+"] <span style='color:"+m.color+"'>"+name+"</span>: "+m.text);
 });
 
 sock.on("play",l=>{
+const u=sock.request.session?.passport?.user;
+if(!u||!u.isAdmin)return;
 radio.url=l;
 radio.time=0;
 radio.playing=true;
 radio.lastUpdate=Date.now();
+radio.broadcaster=u.username;
 io.emit("sync",{...radio,time:getTime()});
 });
 
@@ -274,16 +321,25 @@ io.emit("sync",{...radio,time:getTime()});
 sock.on("skip",()=>{
 radio.url=radio.queue.shift()||null;
 radio.time=0;
+radio.lastUpdate=Date.now();
+radio.playing=true;
 io.emit("sync",{...radio,time:getTime()});
 });
 
 sock.on("pause",()=>{
+radio.time=getTime();
 radio.playing=false;
 io.emit("sync",{...radio,time:getTime()});
 });
 
 sock.on("resume",()=>{
+radio.lastUpdate=Date.now();
 radio.playing=true;
+io.emit("sync",{...radio,time:getTime()});
+});
+
+sock.on("seek",sec=>{
+radio.time=Number(sec);
 radio.lastUpdate=Date.now();
 io.emit("sync",{...radio,time:getTime()});
 });
